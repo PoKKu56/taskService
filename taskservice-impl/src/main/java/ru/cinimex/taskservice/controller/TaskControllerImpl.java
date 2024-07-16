@@ -4,7 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 import ru.cinimex.taskservice.dto.CreateTaskRequest;
+import ru.cinimex.taskservice.dto.CreateTaskResponse;
 import ru.cinimex.taskservice.dto.GetTasksRequest;
+import ru.cinimex.taskservice.dto.PutTaskRequest;
 import ru.cinimex.taskservice.service.TaskService;
 
 import java.util.UUID;
@@ -16,22 +18,27 @@ public class TaskControllerImpl implements TaskController {
     private final TaskService taskService;
 
     @Override
-    public ResponseEntity<?> createTask(CreateTaskRequest createTaskRequest, String token) {
-        return taskService.createTask(createTaskRequest, token);
+    public CreateTaskResponse createTask(CreateTaskRequest createTaskRequest) {
+        return taskService.createTask(createTaskRequest);
     }
 
     @Override
-    public ResponseEntity<?> getAllTasks(GetTasksRequest getTasksRequest, String token) {
-        return taskService.getTasksOfCurrentUser(getTasksRequest, token);
+    public ResponseEntity<?> getAllTasks(GetTasksRequest getTasksRequest) {
+        return taskService.getTasksOfCurrentUser(getTasksRequest);
     }
 
     @Override
-    public ResponseEntity<?> getTaskById(UUID id, String token) {
-        return taskService.getTaskById(id, token);
+    public ResponseEntity<?> getTaskById(UUID id) {
+        return taskService.getTaskById(id);
     }
 
     @Override
-    public ResponseEntity<?> deleteTaskById(UUID id, String token) {
-        return null;
+    public ResponseEntity<?> deleteTaskById(UUID id) {
+        return taskService.deleteTask(id);
+    }
+
+    @Override
+    public ResponseEntity<?> updateTaskById(UUID id, PutTaskRequest putTaskRequest) {
+        return taskService.updateTask(id, putTaskRequest);
     }
 }

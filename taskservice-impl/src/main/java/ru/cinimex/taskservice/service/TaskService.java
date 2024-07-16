@@ -8,36 +8,30 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import ru.cinimex.taskservice.domain.TaskEntity;
-import ru.cinimex.taskservice.domain.UserEntity;
-import ru.cinimex.taskservice.dto.CreateTaskRequest;
-import ru.cinimex.taskservice.dto.CreateTaskResponse;
-import ru.cinimex.taskservice.dto.GetTasksRequest;
-import ru.cinimex.taskservice.dto.GetTaskResponse;
+import ru.cinimex.taskservice.domain.TaskEntity_;
+import ru.cinimex.taskservice.dto.*;
+import ru.cinimex.taskservice.exception.AuntethicationException;
 import ru.cinimex.taskservice.exception.DateException;
+import ru.cinimex.taskservice.exception.TaskException;
+import ru.cinimex.taskservice.exception.UnknownTaskException;
 import ru.cinimex.taskservice.mapper.TaskMapper;
-import ru.cinimex.taskservice.target.TaskEntity_;
 import ru.cinimex.taskservice.repository.TaskRepository;
-import ru.cinimex.taskservice.repository.UserRepository;
-
-import java.text.SimpleDateFormat;
+import java.time.OffsetDateTime;
 import java.util.*;
-
 
 @RequiredArgsConstructor
 @Service
 public class TaskService {
 
     private final TaskRepository taskRepository;
-    private final JwtService jwtService;
-    private final UserRepository userRepository;
     private final TaskMapper taskMapper;
-    private final SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
     public static Specification<TaskEntity> titleAndStatusAndNotificateAtStartAndNotificateAtEnd(
-            final GetTasksRequest getTasksRequest, final UserEntity userEntity){
-        return new Specification<TaskEntity>(){
+            final GetTasksRequest getTasksRequest){
+        return new Specification<>(){
 
             @Override
             public Predicate toPredicate(Root<TaskEntity> root, CriteriaQuery<?> query, CriteriaBuilder criteriaBuilder) {
@@ -50,51 +44,38 @@ public class TaskService {
                         root.get(TaskEntity_.NOTIFICATE_AT), getTasksRequest.getNotificateAtStart());
                 Predicate notificateAtEndPredicate = criteriaBuilder.lessThanOrEqualTo(
                         root.get(TaskEntity_.NOTIFICATE_AT), getTasksRequest.getNotificateAtEnd());
-                Predicate user = criteriaBuilder.equal(root.get(TaskEntity_.USER), userEntity);
+                Predicate assigneePredicate = criteriaBuilder.equal(root.get(TaskEntity_.ASSIGNEE),
+                        SecurityContextHolder.getContext().getAuthentication().getName());
 
                 return criteriaBuilder.and(titlePredicate, statusPredicate,
-                        notificateAtStartPredicate, notificateAtEndPredicate, user);
+                        notificateAtStartPredicate, notificateAtEndPredicate, assigneePredicate);
             }
         };
     }
 
-    public ResponseEntity<?> createTask(CreateTaskRequest createTaskRequest, String token) {
+    public CreateTaskResponse createTask(CreateTaskRequest createTaskRequest) {
 
-        if (checkToken(token)){
-            return ResponseEntity.status(HttpStatusCode.valueOf(401)).body("token is null");
-        }
-
-        if (createTaskRequest.getNotificateAt().before(new Date())){
+        if (createTaskRequest.getNotificateAt().isBefore(OffsetDateTime.now())){
             throw new DateException("Неверная дата срока выполнения.");
         }
 
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
 
-        Optional<UserEntity> user = getUserByToken(token);
-
-        if(user.isPresent()){
-
-            TaskEntity taskEntity = taskMapper.taskDtoToEntity(createTaskRequest);
-            taskEntity.setUser(user.get());
-            taskRepository.save(taskEntity);
-
-            return ResponseEntity.status(HttpStatusCode.valueOf(200))
-                    .body(new CreateTaskResponse(taskEntity.getId()));
+        if (username == null){
+            throw new AuntethicationException("Something went wrong with authentication.");
         }
+        TaskEntity taskEntity = taskMapper.taskDtoToEntity(createTaskRequest);
+        taskEntity.setAssignee(username);
+        taskRepository.save(taskEntity);
 
-        return ResponseEntity.status(HttpStatusCode.valueOf(500)).body("Unknown Error");
+        return new CreateTaskResponse(taskEntity.getId());
     }
 
-    public ResponseEntity<?> getTasksOfCurrentUser(GetTasksRequest getTasksRequest, String token) {
+    public ResponseEntity<?> getTasksOfCurrentUser(GetTasksRequest getTasksRequest) {
 
-        if (checkToken(token)){
-            return ResponseEntity.status(HttpStatusCode.valueOf(401)).body("token is null");
-        }
-
-        Optional<UserEntity> user = getUserByToken(token);
-        if(user.isPresent()){
             Specification<TaskEntity> specification = Specification.where(
-                    titleAndStatusAndNotificateAtStartAndNotificateAtEnd(
-                    getTasksRequest, user.get()));
+                titleAndStatusAndNotificateAtStartAndNotificateAtEnd(
+                getTasksRequest));
 
             Optional<List<TaskEntity>> tasks = taskRepository.findAll(specification);
 
@@ -108,43 +89,60 @@ public class TaskService {
                                         taskEntity.getNotificateAt()
                                 )));
             }
-
             return ResponseEntity.status(HttpStatusCode.valueOf(500)).body("No Tasks Found");
         }
 
+    public ResponseEntity<?> getTaskById(UUID taskId) {
 
-
-        return ResponseEntity.status(HttpStatusCode.valueOf(500)).body("Unknown Error");
+        Optional<TaskEntity> task = taskRepository.findById(taskId);
+        if (task.isEmpty()) {
+            throw new UnknownTaskException("Unknown Task");
+        }
+        return ResponseEntity.status(HttpStatusCode.valueOf(200)).body(new GetTaskResponse(
+                task.get().getId(),
+                task.get().getTitle(),
+                task.get().getDescription(),
+                task.get().getNotificateAt()
+        ));
     }
 
-    public ResponseEntity<?> getTaskById(UUID taskId, String token){
+    public ResponseEntity<?> updateTask(UUID taskId, PutTaskRequest putTaskRequest) {
+        Optional<TaskEntity> task = taskRepository.findById(taskId);
 
-        if (checkToken(token)){
-            return ResponseEntity.status(HttpStatusCode.valueOf(401)).body("token is null");
+        checkTaskBeforeUpdateOrDelete(task);
+
+        taskMapper.updateTaskDtoToEntity(task.get(), putTaskRequest);
+
+        taskRepository.save(task.get());
+
+        return ResponseEntity.status(HttpStatusCode.valueOf(200)).body("Выполнено");
+    }
+
+    public ResponseEntity<?> deleteTask(UUID taskId) {
+
+        Optional<TaskEntity> task = taskRepository.findById(taskId);
+
+        checkTaskBeforeUpdateOrDelete(task);
+
+        taskRepository.delete(task.get());
+
+        return ResponseEntity.status(HttpStatusCode.valueOf(200)).body("Запись успешна удалена");
+    }
+
+    private void checkTaskBeforeUpdateOrDelete(Optional<TaskEntity> task) {
+
+        if (task.isEmpty()){
+            throw new UnknownTaskException("Unknown Task");
         }
 
-        Optional<UserEntity> user = getUserByToken(token);
-        if(user.isPresent()){
-            Optional<TaskEntity> task = taskRepository.findById(taskId);
-            if (task.isPresent()){
-                return ResponseEntity.status(HttpStatusCode.valueOf(200)).body(new GetTaskResponse(
-                        task.get().getId(),
-                        task.get().getTitle(),
-                        task.get().getDescription(),
-                        task.get().getNotificateAt()
-                ));
-            }
+        if (!task.get().getStatus().equals("CREATED")){
+            throw new TaskException("This task is already in progress");
+        }
+        if (!task.get().getAssignee().equals(SecurityContextHolder.getContext().getAuthentication().getName())){
+            throw new TaskException("This task isn't yours");
         }
 
-        return ResponseEntity.status(HttpStatusCode.valueOf(500)).body("Unknown Error");
     }
 
-    private Optional<UserEntity> getUserByToken(String token){
-        return userRepository.findByUsername(jwtService.executeUserName(token));
-    }
-
-    private boolean checkToken(String token){
-        return token == null;
-    }
 
 }

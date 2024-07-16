@@ -15,7 +15,7 @@
         <maven.compiler.target>22</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <propertyFile>\src\main\resources\liquibase.properties</propertyFile>
-        <propertyChangeLogFile>\src\main\resources\db\changelog\database-chagelog.xml</propertyChangeLogFile>
+        <propertyChangeLogFile>/src/main/resources/db.changelog/db.changelog-master.xml</propertyChangeLogFile>
     </properties>
 
     <dependencies>
@@ -23,7 +23,6 @@
         <dependency>
             <groupId>org.liquibase</groupId>
             <artifactId>liquibase-core</artifactId>
-            <version>4.28.0</version>
         </dependency>
         <dependency>
             <groupId>org.postgresql</groupId>
@@ -37,7 +36,6 @@
             <plugin>
                 <groupId>org.liquibase</groupId>
                 <artifactId>liquibase-maven-plugin</artifactId>
-                <version>4.28.0</version>
                 <configuration>
                     <propertyFile>${propertyFile}</propertyFile>
                 </configuration>

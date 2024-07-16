@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.OffsetDateTime;
 import java.util.Date;
 
 @Data
@@ -15,9 +16,9 @@ public class GetTasksRequest {
     private String title;
     private String status;
 
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
-    private Date notificateAtStart;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ssXXX")
+    private OffsetDateTime notificateAtStart;
 
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
-    private Date notificateAtEnd;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ssXXX")
+    private OffsetDateTime notificateAtEnd;
 }

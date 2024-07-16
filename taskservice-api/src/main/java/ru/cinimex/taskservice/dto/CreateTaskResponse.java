@@ -10,7 +10,6 @@ import java.util.UUID;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-
 public class CreateTaskResponse {
 
     private UUID taskId;

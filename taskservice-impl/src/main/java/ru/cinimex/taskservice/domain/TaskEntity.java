@@ -5,7 +5,9 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import ru.cinimex.taskmanagerservice.domain.UserEntity;
 
+import java.time.OffsetDateTime;
 import java.util.Date;
 import java.util.UUID;
 
@@ -26,14 +28,12 @@ public class TaskEntity {
 
     private String status;
 
-    private Date createdAt;
+    private OffsetDateTime createdAt;
 
-    private Date updatedAt;
+    private OffsetDateTime updatedAt;
 
-    private Date notificateAt;
+    private OffsetDateTime notificateAt;
 
-    @ManyToOne
-    @JoinColumn(name="assignee_id", referencedColumnName = "id")
-    private UserEntity user;
+    private String assignee;
 
 }
