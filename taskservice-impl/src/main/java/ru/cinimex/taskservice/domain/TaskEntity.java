@@ -5,10 +5,9 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import ru.cinimex.taskmanagerservice.domain.UserEntity;
 
 import java.time.OffsetDateTime;
-import java.util.Date;
+
 import java.util.UUID;
 
 @Entity
